@@ -6,7 +6,7 @@ def get_coupon_times(
         freq = 2
 ):
     """ computing the number of coupon payments will be made throughout the bond maturity """
-    n_payments = maturity * freq
+    n_payments = int(maturity * freq)
     times_arr = np.array([(i+1) / freq for i in range(n_payments)])
 
     return times_arr
@@ -40,3 +40,37 @@ def bond_pricing_from_df(
     price += (100 + coupon) * dfs[times[-1]]
 
     return price
+
+def solve_last_df(
+        coupon_rate,
+        maturity,
+        known_dfs,
+        freq = 2,
+        face = 100.0,
+        price = 100.0
+):
+    """
+    Solve for the last discount factor of a par bond
+
+    100 = sum(C * DF(t_i)) + (100 + C) * DF(T)
+
+    Parameters
+    coupon_rate: float (in percent)
+    maturity: float (in years)
+    known_dfs: dict {time: df} for earlier coupon dates
+    """
+    coupon = face * (coupon_rate / 100 / freq)
+    times = get_coupon_times(
+        maturity = maturity,
+        freq = freq
+    )
+
+    # sum(C * DF(t_i))
+    pv_known = 0.0
+    for t in times[:-1]:
+        pv_known += coupon * known_dfs[t]
+    
+    final_payment_time = times[-1]
+
+    df_T = (price - pv_known) / (face + coupon)
+    return final_payment_time, df_T

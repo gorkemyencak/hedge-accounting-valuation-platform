@@ -16,3 +16,9 @@ Treasury_Tenors_To_Years = {
 }
 
 Coupon_Freq = 2 # semi-annual Treasury Coupons
+
+Tenors_To_Yearfrac_Interpolation = {
+    'ON': 1/360,
+    '1M': 30/360,
+    '3M': 90/360
+}

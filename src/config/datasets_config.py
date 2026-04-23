@@ -13,11 +13,11 @@ CURVE_CONFIG = {
     },
     # derivatives discounting curve
     'sofr': {
-        'ON': 'SOFR',
-        'FEDFUNDS': 'FEDFUNDS'
+        'ON': 'SOFR'
+        #'FEDFUNDS': 'FEDFUNDS'
     },
     # future proxies
-    'money_market': {
+    'futures': {
         'TBill3M': 'DTB3',
         'TBill6M': 'DTB6'
     }
