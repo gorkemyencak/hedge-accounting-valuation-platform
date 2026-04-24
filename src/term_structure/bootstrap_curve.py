@@ -95,37 +95,3 @@ def bootstrap_df_from_treasury_curve(
         )
 
     return pd.DataFrame(bootstrapped_curves).sort_index(axis=1)
-
-
-def build_zero_curve_from_df(discount_curve: pd.DataFrame) -> pd.DataFrame:
-    """ Converting discount factors into zero rates """
-    zero_curves = []
-
-    for date, row in discount_curve.iterrows():
-        zero_rates = {}
-
-        for tenor, df in row.items():
-            if tenor not in Tenors_To_Yearfrac:
-                continue
-            
-            yearfrac = Tenors_To_Yearfrac[str(tenor)]
-
-            if pd.isna(df):
-                zero_rates[tenor] = None
-                continue
-
-            zero_rate = 100 * zero_rate_from_df(
-                df = df,
-                yearfrac = yearfrac
-            )
-
-            zero_rates[tenor] = zero_rate
-        
-        zero_curves.append(
-            pd.Series(
-                zero_rates,
-                name = date
-            )
-        )
-    
-    return pd.DataFrame(zero_curves)
