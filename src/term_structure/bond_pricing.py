@@ -1,5 +1,7 @@
 import numpy as np
 
+from src.term_structure.curve_interpolation import build_coupon_structure
+
 # coupon payments
 def get_coupon_times(
         maturity,
@@ -10,6 +12,7 @@ def get_coupon_times(
     times_arr = np.array([(i+1) / freq for i in range(n_payments)])
 
     return times_arr
+    
 
 # bond valuation
 def bond_pricing_from_df(
@@ -41,6 +44,7 @@ def bond_pricing_from_df(
 
     return price
 
+
 def solve_last_df(
         coupon_rate,
         maturity,
@@ -52,14 +56,16 @@ def solve_last_df(
     """
     Solve for the last discount factor of a par bond
 
-    100 = sum(C * DF(t_i)) + (100 + C) * DF(T)
+    Formula:
+        100 = sum(C * DF(t_i)) + (100 + C) * DF(T)
 
     Parameters
-    coupon_rate: float (in percent)
-    maturity: float (in years)
-    known_dfs: dict {time: df} for earlier coupon dates
+        coupon_rate: float (in percent)
+        maturity: float (in years)
+        known_dfs: dict {time: df} for earlier coupon dates
     """
     coupon = face * (coupon_rate / 100 / freq)
+
     times = get_coupon_times(
         maturity = maturity,
         freq = freq
@@ -74,3 +80,23 @@ def solve_last_df(
 
     df_T = (price - pv_known) / (face + coupon)
     return final_payment_time, df_T
+
+
+def solve_df_from_par_bond(
+        pv_known: float,
+        coupon: float,
+        face: float = 100.0,
+        price: float = 100.0
+):
+    """ 
+    Solve for the last discount factor from par bond price 
+    
+    Formula:
+        price = pv_known + (face + coupon) * DF(T)
+    
+    Returns:
+        DF(T)
+    """
+    df_T = (price - pv_known) / (face + coupon)
+
+    return df_T

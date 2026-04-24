@@ -2,7 +2,8 @@ import pandas as pd
 
 from src.term_structure.conventions import Tenors_To_Yearfrac, Treasury_Tenors_To_Years, Coupon_Freq
 from src.term_structure.discount_factor_conversions import df_from_simple_rate, zero_rate_from_df
-from src.term_structure.bond_pricing import get_coupon_times, bond_pricing_from_df, solve_last_df
+from src.term_structure.bond_pricing import get_coupon_times, bond_pricing_from_df, solve_last_df, solve_df_from_par_bond
+from src.term_structure.curve_interpolation import build_coupon_structure
 
 
 def bootstrap_df_from_sofr(sofr_curve: pd.DataFrame) -> pd.DataFrame:
@@ -38,50 +39,62 @@ def bootstrap_df_from_sofr(sofr_curve: pd.DataFrame) -> pd.DataFrame:
 
 
 def bootstrap_df_from_treasury_curve(
-        treasury_curve: pd.DataFrame,
-        money_market_dfs: pd.DataFrame
+        treasury_curve: pd.DataFrame, # par-yields
+        interpolated_dfs: pd.DataFrame, # short-end DFs
+        freq = 2,
+        face = 100 
 ):
     """ 
     Bootstrap discount factors from Treasury par yields 
     
     It merges SOFR discount curve (short-end) and treasury par yields (long-end)
     """
-    full_curves = []
+    # building coupon times structure
+    coupon_times = build_coupon_structure(
+        max_year = 30,
+        freq = 2
+    )
+
+    bootstrapped_curves = []
+
     for date in treasury_curve.index:
 
-        dfs = {}
+        treasury_row = treasury_curve.loc[date]
 
-        # Starting with building short-end of the discount curve from money market dfs
-        money_market_row = money_market_dfs.loc[date].dropna()
+        # Starting with building short-end of the discount curve from interpolated money market dfs
+        df_interp_row = interpolated_dfs.loc[date]
 
-        # bootstrapping money market dfs
-        for tenor, df in money_market_row.items():
-            #dfs[Tenors_To_Yearfrac[tenor]] = df
-            dfs[tenor] = df
-        
-        # bootstrapping treasury par yields
-        for tenor, years in Treasury_Tenors_To_Years.items():
-            par_yield = treasury_curve.loc[date, tenor]
-            if pd.isna(par_yield):
-                continue
-            #print('tenor:', tenor, 'par_yield:', par_yield)
+        # building known short-end DFs
+        known_dfs = interpolated_dfs.loc[date].to_dict()
 
-            final_payment_time, df_T = solve_last_df(
-                coupon_rate = par_yield,
-                maturity = years,
-                known_dfs = dfs,
-                freq = Coupon_Freq,
-                face = 100.0,
+        for tenor, maturity in Treasury_Tenors_To_Years.items():
+
+            y = treasury_row[tenor] / 100
+            coupon = y * face / freq
+
+            times = coupon_times[coupon_times <= maturity]
+
+            pv_known = 0.0
+            for t in times[:-1]:
+                pv_known += coupon * known_dfs[t]
+            
+            df_T = solve_df_from_par_bond(
+                pv_known = pv_known,
+                coupon = coupon,
+                face = face,
                 price = 100.0
             )
 
-            dfs[final_payment_time] = df_T
+            known_dfs[maturity] = df_T
         
-        #print('dfs:', dfs)
-        break
+        bootstrapped_curves.append(
+            pd.Series(
+                known_dfs,
+                name = date
+            )
+        )
 
-
-    return None
+    return pd.DataFrame(bootstrapped_curves).sort_index(axis=1)
 
 
 def build_zero_curve_from_df(discount_curve: pd.DataFrame) -> pd.DataFrame:

@@ -27,8 +27,8 @@ def build_term_sofr_curve(
     df['ON'] = sofr_on
     
     # 3M and &M from T-Bills
-    df['1M'] = t_3m
-    df['3M'] = t_6M
+    df['3M'] = t_3m
+    df['6M'] = t_6M
 
     # interpolate 1M between ON and 3M
     df['1M'] = df['ON'] + (df['3M'] - df['ON']) * (1/3)

@@ -3,6 +3,21 @@ import pandas as pd
 
 from src.term_structure.conventions import Tenors_To_Yearfrac_Interpolation
 
+
+def tenor_to_yearfrac(
+        tenor: str
+) -> float:
+    """ Converting tenor string to year fraction """
+    if tenor == 'ON':
+        return 1/360
+    if tenor.endswith('M'):
+        return int(tenor[:-1]) / 12
+    if tenor.endswith('Y'):
+        return int(tenor[:-1])
+    
+    raise ValueError(f'Unknown tenor: {tenor}')
+
+
 def build_coupon_structure(
         max_year = 30,
         freq = 2 
@@ -38,10 +53,18 @@ def interpolate_zero_curve(
     """ Linear interpolation of zero rates to target maturities """
     interpolated_rows = []
     
-    base_times = np.array(list(Tenors_To_Yearfrac_Interpolation.values()))
+    # Converting dataframe columns (tenors) into year fractions
+    base_times = np.array(
+        [tenor_to_yearfrac(t) for t in zero_curve_df.columns],
+        dtype = float
+    )
+
+    # ensure sorted base times
+    sort_idx = np.argsort(base_times)
+    base_times = base_times[sort_idx]
 
     for date, row in zero_curve_df.iterrows():
-        base_rates = row.values.astype(float)
+        base_rates = row.values.astype(float)[sort_idx]
 
         interpolated_rates = np.interp(
             target_times,
