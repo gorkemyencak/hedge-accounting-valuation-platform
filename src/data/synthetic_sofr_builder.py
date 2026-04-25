@@ -33,5 +33,5 @@ def build_term_sofr_curve(
     # interpolate 1M between ON and 3M
     df['1M'] = df['ON'] + (df['3M'] - df['ON']) * (1/3)
 
-    return df.round(2)
+    return df[['ON', '1M', '3M', '6M']].round(2)
 
