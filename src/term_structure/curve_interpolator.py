@@ -8,7 +8,8 @@ def log_linear_curve_interpolator(
 ):
     """ 
     Log linear discount curve interpolator using coupon term structures 
-    
+        -> log-linear interpolation makes the instantaneous forward rates piecewise constant
+            -> positive dfs & stable bootstrapping
     Formula:
         ln DF(t) = w * ln DF(t_1) + (1 - w) * ln DF(t_2)
 
