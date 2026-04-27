@@ -118,3 +118,59 @@ def par_swap_curve(
         )
 
     return swap_curve
+
+# pricing an off-market swap
+def fixed_leg_pv(
+        df_curve: pd.DataFrame,
+        maturity: float,
+        fixed_rate: float,
+        freq: int = 2,
+        notional: float = 1.0
+):
+    """
+    Present value of fixed leg of a swap, assuming that the notional is 1 as default value
+
+    Formula:
+        PV_fixed = N * K * A(T)
+
+        where: 
+            A(T) = fixed_leg_annuity()
+    """
+    annuity = fixed_leg_annuity(
+        df_curve = df_curve,
+        maturity = maturity,
+        freq = freq
+    )
+
+    return notional * fixed_rate * annuity
+
+def swap_npv(
+        df_curve: pd.DataFrame,
+        maturity: float,
+        fixed_rate: float,
+        freq: int = 2,
+        notional: float = 1.0
+):
+    """
+    Net Present Value of a payer swap (pay fixed, receive float)
+
+    Formula:
+        NPV = PV_float - PV_fixed
+    """
+    pv_float = floating_leg_pv(
+        df_curve = df_curve,
+        maturity = maturity
+    )
+
+    pv_fixed = fixed_leg_pv(
+        df_curve = df_curve,
+        maturity = maturity,
+        fixed_rate = fixed_rate,
+        freq = freq,
+        notional = notional
+    )
+
+    npv = pv_float - pv_fixed
+
+    return npv
+

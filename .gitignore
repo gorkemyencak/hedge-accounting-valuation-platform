@@ -8,3 +8,5 @@ data/processed/
 data/features/
 tests/
 project_plan.txt
+swap_pricing_npv.pdf
+swap_pricing_dv01.pdf
