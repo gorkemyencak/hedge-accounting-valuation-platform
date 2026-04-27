@@ -1,6 +1,7 @@
 import numpy as np
+import pandas as pd
 
-
+# rate conversions
 def simple_rate_to_df(
         rate: float,
         t: float
@@ -23,3 +24,22 @@ def df_to_zero(
 ) -> float:
     """ Converting discount factor into continuously compounded zero-rate """
     return -np.log(df) / t
+
+# curve conversions
+def zero_to_discount_curve(
+        zero_curve: pd.DataFrame
+) -> pd.DataFrame:
+    """ 
+    Converting continuously compounded zero curve into discount curve 
+    
+    Formula:
+        DF(t) = exp(-r(t) * t)
+    """
+    df_curve = pd.DataFrame(index = zero_curve.index)
+
+    for t in zero_curve.columns:
+
+        df_curve[t] = np.exp(-zero_curve[t] * float(t))
+
+    return df_curve
+
