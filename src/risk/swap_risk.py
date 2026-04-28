@@ -127,8 +127,10 @@ def _dv01_key_rate(
 
         # Compute DV01 and store in DV01 dictionary
         dv01_dict[tenor] = (npv_shocked - npv_base) / shock
+
+    dv01 = pd.DataFrame(dv01_dict)
     
-    return pd.Series(dv01_dict)
+    return dv01
 
 def _dv01_multi_tenor(
         df_curve: pd.DataFrame,
@@ -138,7 +140,7 @@ def _dv01_multi_tenor(
         freq: int = 2,
         notional: float = 1_000_000
 ):
-    """ Computing DV01 of a payer swap for multi-tenor scenario using multi-tenor shocks  """
+    """ Computing scenario PnL of a payer swap for multi-tenor scenario using multi-tenor shocks  """
     # Base NPV
     npv_base = swap_npv(
         df_curve = df_curve,
@@ -173,14 +175,14 @@ def _dv01_multi_tenor(
     avg_shock_bps = np.mean(list(shock_dict.values()))
     avg_shock = avg_shock_bps * 1e-4
 
-    # Compute DV01
-    dv01 = (npv_shocked - npv_base) / avg_shock
+    # Scenario PnL
+    PnL = npv_shocked - npv_base
 
-    return dv01
+    return PnL
 
 
 # public method
-def swap_dv01_(
+def swap_dv01_pipeline(
         df_curve: pd.DataFrame,
         maturity: float,
         fixed_rate: float,
