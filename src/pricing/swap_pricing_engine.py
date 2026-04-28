@@ -144,6 +144,7 @@ def fixed_leg_pv(
 
     return notional * fixed_rate * annuity
 
+
 def swap_npv(
         df_curve: pd.DataFrame,
         maturity: float,
@@ -156,11 +157,14 @@ def swap_npv(
 
     Formula:
         NPV = PV_float - PV_fixed
+            -> NPV = N * [(1 - DF(T)) - K * A(T)]
     """
-    pv_float = floating_leg_pv(
+    pv_float_unit = floating_leg_pv(
         df_curve = df_curve,
         maturity = maturity
     )
+
+    pv_float = notional * pv_float_unit
 
     pv_fixed = fixed_leg_pv(
         df_curve = df_curve,
@@ -169,8 +173,7 @@ def swap_npv(
         freq = freq,
         notional = notional
     )
-
+    
     npv = pv_float - pv_fixed
 
     return npv
-
