@@ -43,3 +43,19 @@ def zero_to_discount_curve(
 
     return df_curve
 
+def discount_to_zero_curve(
+        df_curve: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Converting discount curve into continuously compounded zero curve
+
+    Formula:
+        r(t) = -ln(DF(t)) / t
+    """
+    zero_curve = pd.DataFrame(index = df_curve.index)
+
+    for t in df_curve.columns:
+
+        zero_curve[t] = -np.log(df_curve[t]) / t
+
+    return zero_curve
