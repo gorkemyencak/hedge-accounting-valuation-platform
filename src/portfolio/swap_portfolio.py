@@ -40,13 +40,18 @@ class SwapPortfolio:
     def portfolio_npv(
             self,
             df_curve: pd.DataFrame
-    ) -> pd.Series:
+    ) -> pd.DataFrame:
         """ Total portfolio NPV as time series """
         trade_npv = self.price_trades(
             df_curve = df_curve
         )
         
         total_npv = trade_npv.sum(axis = 1)
+
+        total_npv = pd.DataFrame(
+            total_npv,
+            columns = ['Portfolio_NPV'] 
+        )
 
         return total_npv
     
@@ -58,25 +63,89 @@ class SwapPortfolio:
             shock_type: str = 'parallel',
             key_rate_tenors: list[float] | None = None,
             multi_tenor_dict: dict[float, float] | None = None
-    ) -> pd.Series:
-        """ Returns trade-level DV01 """
+    ):
+        """ 
+        Returns trade-level DV01 
+        
+        Output depends on the shock type:
+            parallel -> DataFrame indexed by date
+            key_rate -> DataFrame indexed by tenor
+            multi_tenor -> Series (one value per trade)
+        """
         dv01s = {}
 
-        for i, swap in enumerate(self.swaps):
+        # parallel DV01
+        if shock_type == 'parallel':
 
-            dv01s[f'Trade_{i}'] = swap_dv01_pipeline(
-                df_curve = df_curve,
-                maturity = swap.maturity,
-                fixed_rate = swap.fixed_rate,
-                freq = swap.freq,
-                notional = swap.notional,
-                shock_bps = shock_bps,
-                shock_type = shock_type,
-                key_rate_tenors = key_rate_tenors,
-                multi_tenor_dict = multi_tenor_dict 
-            )
+            results = pd.DataFrame(index = df_curve.index)
+
+            for i, swap in enumerate(self.swaps):
+
+                results[f'Trade_{i}'] = swap_dv01_pipeline(
+                    df_curve = df_curve,
+                    maturity = swap.maturity,
+                    fixed_rate = swap.fixed_rate,
+                    freq = swap.freq,
+                    notional = swap.notional,
+                    shock_bps = shock_bps,
+                    shock_type = shock_type,
+                    key_rate_tenors = key_rate_tenors,
+                    multi_tenor_dict = multi_tenor_dict 
+                )
+
+            return results.round(1)
+
+        # key_rate DV01
+        elif shock_type == 'key_rate':
+
+            if key_rate_tenors is None:
+                raise ValueError(f"key_rate_tenors must be provided!")
+            
+            dv01s = {}
+
+            for i, swap in enumerate(self.swaps):
+
+                dv01s[f'Trade_{i}'] = swap_dv01_pipeline(
+                    df_curve = df_curve,
+                    maturity = swap.maturity,
+                    fixed_rate = swap.fixed_rate,
+                    freq = swap.freq,
+                    notional = swap.notional,
+                    shock_bps = shock_bps,
+                    shock_type = shock_type,
+                    key_rate_tenors = key_rate_tenors,
+                    multi_tenor_dict = multi_tenor_dict 
+                )
+            
+            return pd.concat(dv01s, axis = 1).round(1)
         
-        return pd.Series(dv01s)
+        # multi-tenor DV01
+        elif shock_type == 'multi_tenor':
+
+            if multi_tenor_dict is None:
+                raise ValueError(f"multi_tenor_dict must be provided!")
+            
+            results = pd.DataFrame(index = df_curve.index)
+
+            for i, swap in enumerate(self.swaps):
+
+                results[f'Trade_{i}'] = swap_dv01_pipeline(
+                    df_curve = df_curve,
+                    maturity = swap.maturity,
+                    fixed_rate = swap.fixed_rate,
+                    freq = swap.freq,
+                    notional = swap.notional,
+                    shock_bps = shock_bps,
+                    shock_type = shock_type,
+                    key_rate_tenors = key_rate_tenors,
+                    multi_tenor_dict = multi_tenor_dict 
+                )
+            
+            return results.round(1)#pd.Series(dv01s).round(1)
+        
+        else:
+            raise ValueError("Unknown shock_type. Please choose: 'parallel' | 'key_rate' | 'multi_tenor'")
+        
     
     # portfolio-level DV01
     def portfolio_dv01(
@@ -86,7 +155,7 @@ class SwapPortfolio:
             shock_type: str = 'parallel',
             key_rate_tenors: list[float] | None = None,
             multi_tenor_dict: dict[float, float] | None = None
-    ) -> pd.Series:
+    ) -> pd.DataFrame:
         """ Returns portfolio-level DV01 """
         dv01s_by_trade = self.trade_dv01(
             df_curve = df_curve,
@@ -96,10 +165,13 @@ class SwapPortfolio:
             multi_tenor_dict = multi_tenor_dict
         )
 
-        dv01_portfolio = dv01s_by_trade.sum()
+        dv01_portfolio = dv01s_by_trade.sum(axis = 1)
+        dv01_portfolio = pd.DataFrame(
+            dv01_portfolio,
+            columns = ['Portfolio_DV01']
+        )
 
         return dv01_portfolio
-
 
 
     def summary(self) -> pd.DataFrame:

@@ -70,7 +70,7 @@ def _dv01_parallel(
     shock = shock_bps * 1e-4
 
     # Compute DV01
-    dv01 = (npv_shocked - npv_base) / shock
+    dv01 = (npv_shocked - npv_base)
 
     return dv01
 
@@ -126,7 +126,7 @@ def _dv01_key_rate(
         )
 
         # Compute DV01 and store in DV01 dictionary
-        dv01_dict[tenor] = (npv_shocked - npv_base) / shock
+        dv01_dict[tenor] = (npv_shocked - npv_base)
 
     dv01 = pd.DataFrame(dv01_dict)
     
