@@ -70,7 +70,7 @@ class SwapPortfolio:
         Output depends on the shock type:
             parallel -> DataFrame indexed by date
             key_rate -> DataFrame indexed by tenor
-            multi_tenor -> Series (one value per trade)
+            multi_tenor -> DataFrame indexed by date
         """
         dv01s = {}
 
@@ -117,7 +117,9 @@ class SwapPortfolio:
                     multi_tenor_dict = multi_tenor_dict 
                 )
             
-            return pd.concat(dv01s, axis = 1).round(1)
+            results = pd.concat(dv01s, axis = 1)
+            results.columns = [f'{trade}_{int(tenor)}Y' for trade, tenor in results.columns]
+            return results.round(1)
         
         # multi-tenor DV01
         elif shock_type == 'multi_tenor':
@@ -141,7 +143,7 @@ class SwapPortfolio:
                     multi_tenor_dict = multi_tenor_dict 
                 )
             
-            return results.round(1)#pd.Series(dv01s).round(1)
+            return results.round(1)
         
         else:
             raise ValueError("Unknown shock_type. Please choose: 'parallel' | 'key_rate' | 'multi_tenor'")
@@ -157,6 +159,7 @@ class SwapPortfolio:
             multi_tenor_dict: dict[float, float] | None = None
     ) -> pd.DataFrame:
         """ Returns portfolio-level DV01 """
+        # trade-level DV01s
         dv01s_by_trade = self.trade_dv01(
             df_curve = df_curve,
             shock_bps = shock_bps,
@@ -165,13 +168,47 @@ class SwapPortfolio:
             multi_tenor_dict = multi_tenor_dict
         )
 
-        dv01_portfolio = dv01s_by_trade.sum(axis = 1)
-        dv01_portfolio = pd.DataFrame(
-            dv01_portfolio,
-            columns = ['Portfolio_DV01']
-        )
+        # portfolio-level DV01s
+        if shock_type in ['parallel', 'multi_tenor']:
 
-        return dv01_portfolio
+            dv01_portfolio = dv01s_by_trade.sum(axis = 1)
+            dv01_portfolio = pd.DataFrame(
+                dv01_portfolio,
+                columns = ['Portfolio_DV01']
+            )
+            
+            return dv01_portfolio
+        
+        elif shock_type == 'key_rate':
+
+            # sum across trades
+            dv01_portfolio = (
+                dv01s_by_trade
+                .T
+                .groupby(lambda c: c.rsplit('_', 1)[1])
+                .sum()
+                .T                
+            )
+
+            # ensure sorted column indices
+            dv01_portfolio = (
+                dv01_portfolio
+                .reindex(
+                    sorted(
+                        dv01_portfolio.columns,
+                        key = lambda x: float(x[:-1])
+                    ),
+                    axis = 1
+                )
+            )
+
+            # renaming columns
+            dv01_portfolio.columns = [f'Portfolio_DV01_{tenor}' for tenor in dv01_portfolio.columns]
+
+            return dv01_portfolio.round(1)
+
+        else:
+            raise ValueError("Unknown shock_type. Please choose: 'parallel' | 'key_rate' | 'multi_tenor'")
 
 
     def summary(self) -> pd.DataFrame:
