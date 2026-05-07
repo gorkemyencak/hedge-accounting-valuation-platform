@@ -12,7 +12,7 @@ class HedgeInstrument:
     fixed_rate: float = 0.0
     freq: int = 2
     notional: float = 1_000_000
-    pay_receive: str = 'receive'
+    pay_receive: str = 'receiver'
 
 
 class HedgeUniverse:
@@ -23,7 +23,7 @@ class HedgeUniverse:
     ):
         # attributes
         self.instruments = instruments  
-        self.swaps = List[IRSwap] | None = None     # type: ignore
+        self.swaps: List[IRSwap] | None = None     # type: ignore
 
 
     # HedgeInstruments -> IRSwap objects
@@ -56,6 +56,7 @@ class HedgeUniverse:
                 'Instrument': hedgeinst.name,
                 'Type': hedgeinst.pay_receive,
                 'Maturity': hedgeinst.maturity,
+                'Par Rate': hedgeinst.fixed_rate,
                 'Notional': hedgeinst.notional,
                 'CouponFreq': hedgeinst.freq
             })
