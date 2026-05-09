@@ -38,8 +38,8 @@ class IRSwap:
         if self.maturity <= 0:
             raise ValueError('maturity must be strictly positive!')
         
-        if self.notional <= 0:
-            raise ValueError('notional must be strictly positive!')
+        #if self.notional <= 0:
+        #    raise ValueError('notional must be strictly positive!')
         
         if self.freq <= 0:
             raise ValueError('frequency must be a positive integer number!')

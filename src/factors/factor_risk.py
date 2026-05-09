@@ -202,7 +202,7 @@ class FactorRiskModel:
         # pnl
         pnl = f.T @ shock_vector
 
-        return float(pnl)
+        return float(pnl[0][0])
     
 
     def factor_to_yield_shock(

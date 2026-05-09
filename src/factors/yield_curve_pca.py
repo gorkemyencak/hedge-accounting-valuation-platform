@@ -68,7 +68,7 @@ class YieldCurvePCA:
     def fit(
             self, 
             zero_curve: pd.DataFrame,
-            key_rate_tenors: list[float] | None = None,
+            key_rate_tenors: list[float] | None = None
     ):
         """ 
         Computing PCA by fitting in the historical yield curve 
@@ -83,7 +83,7 @@ class YieldCurvePCA:
         """
         # selecting liquid market tenors
         key_tenors = key_rate_tenors
-        zero_curve = zero_curve[key_tenors]
+        zero_curve = zero_curve[key_tenors]     # type: ignore
 
         # storing tenor labels
         self.tenors = zero_curve.columns.astype(float)

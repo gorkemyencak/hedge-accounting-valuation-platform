@@ -48,9 +48,22 @@ class HedgeRatio:
         residual_exposure
     ):
         """ Summary hedge report containing portfolio and residual exposures """
+        # converting hedge notionals into np.array
+        hedge_notionals_arr = np.array(hedge_notionals)
+        
+        # determining the hedge type
+        hedge_type = np.where(hedge_notionals_arr >= 0, 'receiver', 'payer')
+
+        # trade notionals - converting hedge notional multipiers into thousands
+        hedge_base = 1e6
+        trade_notionals_k = hedge_notionals_arr * hedge_base / 1000
+        trade_notionals_k_str = [f'{x:.1f}k' for x in trade_notionals_k]
+
         hedge_df = pd.DataFrame({
             'HedgeInstrument': hedge_names,
-            'Notional': hedge_notionals
+            'Type': hedge_type,
+            'Notional': hedge_notionals,
+            'TradeNotional_USD': trade_notionals_k_str
         })
 
         exposure_df = pd.DataFrame({
