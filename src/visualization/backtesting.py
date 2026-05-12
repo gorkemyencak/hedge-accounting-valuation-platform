@@ -83,12 +83,86 @@ class BacktestVisualizer:
         plt.show()
 
     
+    @staticmethod
+    def plot_var_overlay(
+        pnl,
+        var_series,
+        confidence: float = 0.99
+    ):
+        """ 
+        Plot daily PnL against VaR forecast 
+        
+        Breach condition:
+            PnL_t < -VaR_t
+        """
+        plt.figure(figsize = (12, 5))
+        plt.plot(
+            pnl,
+            label = 'Daily PnL'
+        )
+        plt.plot(
+            -var_series,
+            label = f'-VaR ({str(100 * confidence)}%)'
+        )
+        plt.title('PnL vs VaR', fontweight = 'bold')
+        plt.legend(loc = 'best')
+        plt.axhline(0, linestyle = '--', color = 'black')
+        plt.show()
+
+    
+    @staticmethod
+    def plot_var_breaches(
+        pnl,
+        var_series
+    ):
+        """ Plot VaR breach timeline """
+        breaches = pnl < -var_series
+
+        plt.figure(figsize = (12, 5))
+        plt.plot(
+            pnl,
+            label = 'Daily PnL'
+        )
+        plt.scatter(
+            pnl.index[breaches],
+            pnl[breaches],
+            marker = 'o',
+            s = 20,
+            color = 'red',
+            edgecolors = 'red',
+            label = 'Breach'
+        )
+        plt.title('VaR Breach Timeline', fontweight = 'bold')
+        plt.legend(loc = 'best')
+        plt.axhline(0, linestyle = '--', color = 'black')
+        plt.show()
+
+
+    @staticmethod
+    def plot_cumulative_breaches(
+        pnl,
+        var_series
+    ):
+        """ Cumulative exception monitoring """
+        breaches = (pnl < -var_series).astype(int)
+        cum_breaches = breaches.cumsum()
+
+        plt.figure(figsize = (12, 5))
+        plt.plot(
+            cum_breaches,
+            label = 'Cumulative Breaches'
+        )
+        plt.title('Cumulative VaR Breaches', fontweight = 'bold')
+        plt.legend(loc = 'best')
+        plt.show()
+
+    
     # Full Report Pipeline
     @staticmethod
     def backtest_visualizer_pipeline(
         pnl_pre,
         pnl_post,
-        window_size
+        window_size,
     ):
         """ Generate full backtest visualizer plots """
         BacktestVisualizer.plot_cumulative_pnl(
@@ -104,3 +178,26 @@ class BacktestVisualizer:
             pnl_pre = pnl_pre,
             pnl_post = pnl_post
         )
+    
+
+    @staticmethod
+    def var_backtest_visualizer_pipeline(
+        pnl,
+        var,
+        confidence,
+    ):
+        """ Generate full backtest visualizer plots """
+        BacktestVisualizer.plot_var_overlay(
+            pnl = pnl,
+            var_series = var,
+            confidence = confidence
+        )
+        BacktestVisualizer.plot_var_breaches(
+            pnl = pnl,
+            var_series = var
+        )
+        BacktestVisualizer.plot_cumulative_breaches(
+            pnl = pnl,
+            var_series = var
+        )
+       
