@@ -40,7 +40,7 @@ class ScenarioEngine:
                 z_shock = (V^T x V)^-1 x V^T x Δy -> (self.n_factors x 1) = (self.n_factors x self.n_factors) x (self.n_factors x tenor) x (tenor x 1)
         """
         # eigenvector
-        V = self.pca_loadings.values    # (tenor x self.n_factors)
+        V = self.pca_loadings    # (tenor x self.n_factors)
 
         # yield shock
         dy = np.array(yield_shock_vector).reshape(-1, 1)    # (tenor x 1)
@@ -104,6 +104,7 @@ class ScenarioEngine:
             columns = self.factor_returns.columns
         )
     
+
     # user-defined custom shock generator
     def custom_scenarios(
               self,
@@ -129,26 +130,26 @@ class ScenarioEngine:
         # yield curve shock scenarios
         yc_shock_scenarios = {
              # 100 bps paralel shift scenarios
-             'Parallel Up': np.ones(N) * parallel_shock,
-             'Parallel Down': np.ones(N) * -parallel_shock,
+             'Parallel Up': (np.ones(N) * parallel_shock) / 10000,
+             'Parallel Down': (np.ones(N) * -parallel_shock) / 10000,
 
              # short rate up
-             'Short Up': np.linspace(short_rate_shock, +10, N),
+             'Short Up': np.linspace(short_rate_shock, +10, N) / 10000,
             
              # short rate down
-             'Short Down': np.linspace(-short_rate_shock, -10, N),
+             'Short Down': np.linspace(-short_rate_shock, -10, N) / 10000,
 
              # curve steepener
              'Steepener': np.concatenate([
                   np.ones(N//2) * np.linspace(-steepener_shock, -10, N//2),
                   np.ones(N - N//2) * np.linspace(+10, steepener_shock, N - N//2)
-             ]),
+             ]) / 10000,
 
              # curve flattener
              'Flattener': np.concatenate([
                   np.ones(N//2) * np.linspace(flattener_shock, +10, N//2),
                   np.ones(N - N//2) * np.linspace(-10, -flattener_shock, N - N//2)
-             ])
+             ]) / 10000
         }
 
         # computing factor scenarios
@@ -167,3 +168,61 @@ class ScenarioEngine:
         )
 
         return Z_custom
+    
+
+    # scenario PnL series
+    @staticmethod
+    def scenario_pnl(
+            factor_scenarios,
+            factor_exposure
+    ):
+        """ 
+        Convert factor scenarios into scenario PnL distribution 
+        
+        Returning scenario PnL distribution series (nb_scenarios x 1)
+
+        Formula:
+            PnL_scen = Z_scen x f -> (nb_scenarios x 1) = (nb_scenarios x self.n_factors) x (self.n_factors x 1)
+
+            where:
+                Z_scen: factor scenarios -> (nb_scenarios x self.n_factors)
+                f: factor exposures -> (self.n_factors x 1)
+        """
+        # factor scenarios
+        Z = factor_scenarios.values
+
+        # factor exposures
+        f = np.array(factor_exposure).reshape(-1, 1)
+
+        # compute scenario PnL dist.
+        pnl = Z @ f
+
+        pnl = pnl.flatten()
+
+        return pd.Series(
+            pnl,
+            name = 'Scenario_PnL'
+        )
+    
+
+    # risk metrics: VaR & CVaR
+    @staticmethod
+    def scenario_risk_metrics(
+        scenario_pnl,
+        confidence: float = 0.99
+    ):
+        """ Compute forward-looking scenario VaR & CVaR """
+        # losses series
+        loss = scenario_pnl
+
+        # VaR(confidence %)
+        var = -np.quantile(loss, confidence)
+
+        # Expected Shortfall (CVaR)
+        cvar = loss[loss < var].mean()
+
+        return {
+            'Scenario VaR:': var,
+            'Scenario CVaR': cvar,
+            'Worst Loss': loss.min()
+        }
