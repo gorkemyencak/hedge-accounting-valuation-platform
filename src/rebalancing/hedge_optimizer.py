@@ -81,19 +81,25 @@ class HedgeOptimizer:
         # get latest DV01 snapshot
         dv01_most_recent = trade_dv01_ts.iloc[-1]
 
+        # reshaping dv01_most_recent into (nb_instruments x tenor) matrix
+        nb_instruments = len(hedge_universe.instruments)
+        nb_tenors = len(self.key_rate_tenors)
+
+        dv01_matrix = dv01_most_recent.values.reshape(nb_instruments, nb_tenors)
+
         hedge_factor_vectors = []
 
-        for trade_name in dv01_most_recent.index.unique():
+        for i in range(nb_instruments):
 
-            # extracting DV01 per tenor for this trade
-            dv01_trade = dv01_most_recent.filter(like = trade_name)
-
-            # rename index into tenor labels for PCA model
-            dv01_trade.index = self.factor_risk_model.pca_model.tenors
+            # initialize full key-rate DV01 vector
+            dv01_vector = pd.Series(
+                dv01_matrix[i],
+                index = self.key_rate_tenors
+            )
 
             # convert to factor exposure
             factor_exposure = self.factor_risk_model.tenor_to_factor_exposure(
-                dv01_vector = dv01_trade
+                dv01_vector = dv01_vector
             )
 
             hedge_factor_vectors.append(np.array(factor_exposure))

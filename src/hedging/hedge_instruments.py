@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List
 
 from src.portfolio.swap_object import IRSwap
+from src.portfolio.swap_portfolio import SwapPortfolio
 
 @dataclass
 class HedgeInstrument:
@@ -23,6 +24,7 @@ class HedgeUniverse:
     ):
         # attributes
         self.instruments = instruments  
+        self.instrument_names = [inst.name for inst in self.instruments]
         self.swaps: List[IRSwap] | None = None     # type: ignore
 
 
@@ -62,3 +64,28 @@ class HedgeUniverse:
             })
         
         return pd.DataFrame(rows)
+    
+
+    def trade_dv01(
+            self,
+            df_curve,
+            shock_type,
+            key_rate_tenors
+    ):
+        """ 
+        Returns DV01 timeseries per hedge instrument (unit notional) """
+        # build IRSwap objects
+        if self.swaps is None:
+            self.build_IRswaps()
+
+        # treat hedge instruments as a portfolio
+        hedge_portfolio = SwapPortfolio(swaps = self.swaps) # type: ignore
+
+        # compute DV01 timeseries (per instrument)
+        dv01_ts = hedge_portfolio.trade_dv01(
+            df_curve = df_curve,
+            shock_type = shock_type,
+            key_rate_tenors = key_rate_tenors
+        )
+
+        return dv01_ts

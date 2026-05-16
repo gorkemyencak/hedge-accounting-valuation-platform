@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 
+from src.portfolio.swap_portfolio import SwapPortfolio
+
 class RollingHedgeEngine:
     """
     Rolling Hedge Engine builds a time-evolving hedging simulator by re-estimating hedge regularly,
@@ -37,20 +39,30 @@ class RollingHedgeEngine:
             dates
     ):
         """
-        Converting daily index into rebalance dates
+        Converting daily index into rebalance dates aligned to available market dates.
+        We allow rebalance on the last available trading day of each period.
 
         T_rebalance = {t_0, t_n, t_2n, ..}
 
         where:
             n = rebalance window
         """
+        # create series of ones with market index
+        s = pd.Series(
+            1,
+            index = dates
+        )
+
         # rebalance schedule
         rebalance_dates = (
-            pd.Series(index = dates)
-            .resample(rule = self.r_freq)
+            s.resample(rule = self.r_freq)
             .last()
+            .dropna()
             .index
         )
+
+        # guarantee they exist in curve index
+        rebalance_dates = dates.intersection(rebalance_dates)
 
         return rebalance_dates
     
@@ -70,34 +82,92 @@ class RollingHedgeEngine:
             hedge_positions,
             key_rate_tenors            
     ):
-        """ Converts piecewise-constant hedge notionals into daily DV01 timeseries """
-        # hedge trade DV01 timeseries (per unit notional)
-        trade_dv01_ts = hedge_universe.trade_dv01(
-            df_curve = df_curve,
-            shock_type = 'key_rate',
-            key_rate_tenors = key_rate_tenors            
+        """ 
+        Build daily DV01 of the hedge portfolio (parallel DV01 per instrument) 
+        Formula:
+            portfolio DV01 = sum_i (weight_i * DV01_i) -> (dates x tenors)
+        """
+        # get dates
+        dates = df_curve.index
+
+        # hedge dv01 container
+        hedge_portfolio_dv01 = pd.DataFrame(
+            index = dates,
+            columns = key_rate_tenors,
+            dtype = float
         )
 
-        hedge_dv01_daily = pd.DataFrame(
-            0,
-            index = df_curve.index,
-            columns = trade_dv01_ts.columns
-        )
+        # to compute DV01 per swap individually
+        dv01_list = []
 
-        for i, reb_date in enumerate(hedge_positions.index):
+        for inst in hedge_universe.instruments:
+            
+            # create single swap portfolio for each hedge instrument 
+            single_swap_portfolio = SwapPortfolio(swaps = [inst])
 
-            start = reb_date
-            end = hedge_positions.index[i+1] if i+1 < len(hedge_positions) else df_curve.index[-1]
-
-            weights = hedge_positions.loc[reb_date].values
-
-            mask = (
-                (hedge_dv01_daily.index >= start) & (hedge_dv01_daily.index <= end)
+            # key-rate DV01 timeseries for each hedge instrument
+            dv01_ts = single_swap_portfolio.portfolio_dv01(
+                df_curve = df_curve,
+                shock_type = 'key_rate',
+                key_rate_tenors = key_rate_tenors
             )
 
-            hedge_dv01_daily.loc[mask] = trade_dv01_ts.loc[mask].values * weights
+            # create column MultiIndex: (instrument, tenor)
+            dv01_ts.columns = pd.MultiIndex.from_product(
+                [[inst.name], dv01_ts.columns]
+            )
+
+            dv01_list.append(dv01_ts)
         
-        return hedge_dv01_daily
+        # concatenate all instruments along columns -> (dates x (instruments x tenors))
+        hedge_dv01_matrix = pd.concat(dv01_list, axis = 1)
+        
+        # apply hedge weights between rebalances
+        rebalance_dates = hedge_positions.index
+
+        for i, reb_date in enumerate(rebalance_dates):
+
+            #start = reb_date
+            start_idx = dates.get_loc(reb_date) + 1
+
+            if start_idx >= len(dates):
+                continue
+
+            start = dates[start_idx]
+
+            end = dates[-1] if i == len(rebalance_dates) - 1 else rebalance_dates[i+1]
+
+            weights = hedge_positions.loc[reb_date]
+
+            mask = (dates >= start) & (dates < end)
+
+            inst_dv01 = hedge_dv01_matrix.loc[mask]
+
+            weighted = sum(
+                weights[name] * inst_dv01[name]
+                for name in weights.index
+            )
+
+            hedge_portfolio_dv01.loc[mask] = weighted
+        
+        return hedge_portfolio_dv01
+
+    # daily portfolio DV01 timeseries
+    def _build_daily_portfolio_dv01(self, portfolio, df_curve, key_rate_tenors):
+        dates = df_curve.index
+        rebalance_dates = self.hedge_positions.index # type:ignore
+
+        # dv01 at rebalance dates
+        portfolio_dv01_reb = portfolio.portfolio_dv01(
+            df_curve = df_curve.loc[rebalance_dates],
+            shock_type = 'key_rate',
+            key_rate_tenors = key_rate_tenors
+        )
+
+        # forward fill between rebalances
+        portfolio_dv01_daily = portfolio_dv01_reb.reindex(dates).ffill()
+        return portfolio_dv01_daily
+
     
     # daily PnL computation
     def compute_pnl(
@@ -111,21 +181,21 @@ class RollingHedgeEngine:
         Computing hedged PnL time series 
         
         Portfolio-level PnL Formula:
-            PnL_portfolio = -sum(DV01_{t-1} x dy_{t})
+            PnL_portfolio = -sum(DV01_{t-1} x dy_{t} * 10000)
 
         Hedge Assets PnL Formula:
-            PnL_hedge = +sum(DV01_{t-1} x dy_{t})
+            PnL_hedge = +sum(DV01_{t-1} x dy_{t} * 10000)
 
         Total PnL Formula:
             PnL_total = PnL_portfolio + PnL_hedge - transaction_costs
         """
         # delta yield changes
-        dy = self._compute_yield_changes(yield_curve = df_curve)
-
+        dy = self._compute_yield_changes(yield_curve = df_curve) * 10000
+        
         # portfolio DV01
-        portfolio_dv01 = portfolio.portfolio_dv01(
+        portfolio_dv01 = self._build_daily_portfolio_dv01(
+            portfolio = portfolio,
             df_curve = df_curve,
-            shock_type = 'key_rate',
             key_rate_tenors = key_rate_tenors
         )
 
@@ -135,7 +205,7 @@ class RollingHedgeEngine:
             df_curve = df_curve,
             hedge_positions = self.hedge_positions,
             key_rate_tenors = key_rate_tenors
-        )
+        )     
 
         # align indices
         portfolio_dv01 = portfolio_dv01.loc[dy.index]
@@ -183,8 +253,14 @@ class RollingHedgeEngine:
             new_hedge, _ = self.hedge_engine.solve_opt_hedge(
                 portfolio = portfolio,
                 hedge_universe = hedge_universe,
-                df_curve = df_curve,
+                df_curve = df_curve.loc[:date],
                 rebalance_date = date
+            )
+
+            # converting new_hedge numpy array into series
+            new_hedge = pd.Series(
+                new_hedge,
+                index = hedge_universe.instrument_names
             )
 
             # turnover -> compute trades vs previous hedge
@@ -197,16 +273,23 @@ class RollingHedgeEngine:
             ).iloc[-1].values[0]
 
             # transaction cost
-            cost = self.tc_model.rebalance_cost(
-                w_old = current_hedge,
-                w_new = new_hedge,
-                portfolio_dv01 = portfolio_dv01_today
-            )
+            if current_hedge is None:
+                cost = self.tc_model.rebalance_cost(
+                    w_old = pd.Series(0, index = new_hedge.index),
+                    w_new = new_hedge,
+                    portfolio_dv01 = portfolio_dv01_today
+                )
+            else:
+                cost = self.tc_model.rebalance_cost(
+                    w_old = current_hedge,
+                    w_new = new_hedge,
+                    portfolio_dv01 = portfolio_dv01_today
+                )
 
             # setting storage attributes
             hedge_positions[date] = new_hedge
             trades[date] = trade
-            costs[dates] = cost
+            costs[date] = cost
 
             current_hedge = new_hedge
         
@@ -225,5 +308,3 @@ class RollingHedgeEngine:
 
         return self
     
-
-

@@ -83,7 +83,7 @@ class YieldCurvePCA:
         """
         # selecting liquid market tenors
         key_tenors = key_rate_tenors
-        zero_curve = zero_curve[key_tenors]     # type: ignore
+        zero_curve = zero_curve.loc[:, key_tenors]     # type: ignore
 
         # storing tenor labels
         self.tenors = zero_curve.columns.astype(float)
@@ -171,3 +171,5 @@ class YieldCurvePCA:
             index = self.factor_returns.index, # type: ignore
             columns = self.tenors
         ) 
+
+        return reconstructed_curve

@@ -13,10 +13,11 @@ class TransactionCostModel:
     """
     def __init__(
             self,
-            spread_bps: dict,
+            hedge_universe,
+            custom_spread_bps: dict,
             impact_coeff: float = 0.10,
             daily_vol_bps: float = 7.0,
-            fixed_cost: float = 0.00
+            fixed_cost: float = 50.00
     ):
         """
         Parameters:
@@ -25,10 +26,27 @@ class TransactionCostModel:
             daily_vol_bps: typical daily yield volatility
             fixed_cost: Fixed broker fee per trade (USD)
         """
-        self.spread_bps = spread_bps
+        self.hedge_universe = hedge_universe
+        self.custom_spread_bps = custom_spread_bps
         self.impact_coeff = impact_coeff
         self.daily_vol = daily_vol_bps / 10000
         self.fixed_cost = fixed_cost
+
+        self.spread_bps = self._build_spread_dictionary(
+            self.hedge_universe,
+            self.custom_spread_bps
+        )
+
+    # spread dictionary builder
+    def _build_spread_dictionary(self, hedge_universe, custom_spread_bps):
+        """ Assigning bid/ask spreads defined in custom spread dictionary to spread dictionary with instrument names """
+        spread_dict = {}
+        
+        for inst in hedge_universe.instruments:
+
+            spread_dict[inst.name] = custom_spread_bps[inst.name.split('_')[-1]]
+
+        return spread_dict
 
     # cost components
     def spread_cost(

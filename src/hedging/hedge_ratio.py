@@ -7,7 +7,7 @@ class HedgeRatio:
     
     Hedging condition:
         f_p + F_h^T x w = 0
-            -> w = (F_h^T)^-1 x -f_p
+            -> w = -(F_h)^-1 x f_p
 
         where
             f_p -> portfolio_factor_exposure_vector -> (self.n_factors x 1)
@@ -21,7 +21,7 @@ class HedgeRatio:
     ):
         """ Returns hedge notionals vector using PCA factor exposures """
         # computing hegde notionals vector using Moore-Penrose pseudo inverse of a matrix
-        w = np.linalg.pinv(hedge_factor_matrix.T) @ -portfolio_factor_exposure
+        w = -np.linalg.pinv(hedge_factor_matrix.T) @ portfolio_factor_exposure 
     
         return w
     
