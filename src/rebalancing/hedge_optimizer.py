@@ -148,5 +148,4 @@ class HedgeOptimizer:
         )
 
         return hedge_notionals, residual_factor_exposure
-
-
+    

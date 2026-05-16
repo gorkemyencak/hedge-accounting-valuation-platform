@@ -83,7 +83,7 @@ class RollingHedgeEngine:
             key_rate_tenors            
     ):
         """ 
-        Build daily DV01 of the hedge portfolio (parallel DV01 per instrument) 
+        Build daily DV01 of the hedge portfolio (key-rate DV01 per instrument) 
         Formula:
             portfolio DV01 = sum_i (weight_i * DV01_i) -> (dates x tenors)
         """
